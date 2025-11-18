@@ -18,9 +18,18 @@ import {
   decrypt as playfairDecrypt,
   cleanDecryptedKeepPunct as playfairClean
 } from "./Algorithms/Playfair_cipher.js";
-
+import cors from "cors";
 dotenv.config();
-
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3001",
+      "https://classicalencryption-uvwe.onrender.com"
+    ],
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
 const app = express();
 app.use(cors());
 app.use(express.json());
