@@ -18,25 +18,31 @@ import {
   decrypt as playfairDecrypt,
   cleanDecryptedKeepPunct as playfairClean
 } from "./Algorithms/Playfair_cipher.js";
+
 dotenv.config();
+
+const app = express();
+
+// ================= CORS MUST BE AFTER APP =================
 app.use(
   cors({
     origin: [
       "http://localhost:3001",
-      "https://classicalencryption-uvwe.onrender.com"
+      "https://classicalencryptiontechnique.onrender.com"
     ],
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
     credentials: true,
   })
 );
-const app = express();
+
+// Body parser
 app.use(express.json());
 
 // ========== ROUTERS ==========
 app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
 
-// Health
+// Health Check
 app.get("/", (_, res) => res.send("Backend is running successfully!"));
 
 // Helpers
@@ -197,7 +203,7 @@ const PORT = process.env.PORT || 3000;
   try {
     await connectDB();
     app.listen(PORT, () =>
-      console.log(`Server running on http://localhost:${PORT}`)
+      console.log(`Server running on port ${PORT}`)
     );
   } catch (err) {
     console.error("Failed to start server:", err);
