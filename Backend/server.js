@@ -18,7 +18,6 @@ import {
   decrypt as playfairDecrypt,
   cleanDecryptedKeepPunct as playfairClean
 } from "./Algorithms/Playfair_cipher.js";
-import cors from "cors";
 dotenv.config();
 app.use(
   cors({
@@ -31,7 +30,6 @@ app.use(
   })
 );
 const app = express();
-app.use(cors());
 app.use(express.json());
 
 // ========== ROUTERS ==========
