@@ -5,8 +5,9 @@ import {
   Route,
   Navigate,
 } from "react-router-dom";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
@@ -15,34 +16,13 @@ import CipherLabPage from "./pages/CipherLabPage";
 import MissionsPage from "./pages/MissionsPage";
 import ProfilePage from "./pages/ProfilePage";
 import OAuthCallbackPage from "./pages/OAuthCallbackPage";
-
-// Protected Route Component using useAuth
-const ProtectedRoute = ({ element }) => {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-200">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-slate-400">Loading your workspace…</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return element;
-};
+import MissionAttemptPage from './pages/MissionAttemptPage';
 
 function App() {
   return (
     <Router>
-      <ThemeProvider>
         <AuthProvider>
+          <ThemeProvider>
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
@@ -62,6 +42,10 @@ function App() {
               element={<ProtectedRoute element={<MissionsPage />} />}
             />
             <Route
+              path="/mission-attempt"
+              element={<ProtectedRoute element={<MissionAttemptPage />} />}
+            />
+            <Route
               path="/profile"
               element={<ProtectedRoute element={<ProfilePage />} />}
             />
@@ -69,8 +53,9 @@ function App() {
             {/* Fallback: go home (will redirect to login if not authed) */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </ThemeProvider>
         </AuthProvider>
-      </ThemeProvider>
+      
     </Router>
   );
 }
