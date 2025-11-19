@@ -23,18 +23,17 @@ dotenv.config();
 
 const app = express();
 
-// ================= CORS MUST BE AFTER APP =================
+// CORRECTED:
 app.use(
   cors({
     origin: [
       "http://localhost:3001",
-      "https://classicalencryptiontechnique.onrender.com"
+      "https://classicalencryption-yw99.onrender.com"  // ✅ CORRECT
     ],
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
     credentials: true,
   })
 );
-
 // Body parser
 app.use(express.json());
 
