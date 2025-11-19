@@ -1,3 +1,4 @@
+// Frontend/src/App.js
 import React from "react";
 import {
   BrowserRouter as Router,
@@ -13,6 +14,7 @@ import SignupPage from "./pages/SignupPage";
 import HomePage from "./pages/HomePage";
 import CipherLabPage from "./pages/CipherLabPage";
 import MissionsPage from "./pages/MissionsPage";
+import MissionAttemptPage from "./pages/MissionAttemptPage";
 import ProfilePage from "./pages/ProfilePage";
 import OAuthCallbackPage from "./pages/OAuthCallbackPage";
 
@@ -60,6 +62,10 @@ function App() {
             <Route
               path="/missions"
               element={<ProtectedRoute element={<MissionsPage />} />}
+            />
+            <Route
+              path="/mission-attempt"
+              element={<ProtectedRoute element={<MissionAttemptPage />} />}
             />
             <Route
               path="/profile"
