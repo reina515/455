@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 
 // ===== API helper =====
-const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:3000";
+const API_BASE = process.env.REACT_APP_API_URL  || "http://localhost:3000";
 async function postJSON(path, body) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
