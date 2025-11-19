@@ -20,6 +20,7 @@ import { useTheme } from '../contexts/ThemeContext';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:3000';
 
+// Helper for Authorization header
 function authHeaders() {
   const t = localStorage.getItem('auth_token');
   return t ? { Authorization: `Bearer ${t}` } : {};
@@ -31,8 +32,8 @@ const ProfilePage = () => {
   const navigate = useNavigate();
 
   const [editMode, setEditMode] = useState(false);
-  const [editName, setEditName] = useState(user.name);
-  const [editEmail, setEditEmail] = useState(user.email);
+  const [editName, setEditName] = useState(user?.name || "");
+  const [editEmail, setEditEmail] = useState(user?.email || "");
   const [passwords, setPasswords] = useState({
     current: '',
     new: '',
@@ -60,6 +61,44 @@ const ProfilePage = () => {
     const timer = setTimeout(() => setNotification(null), 4000);
     return () => clearTimeout(timer);
   }, [notification]);
+
+  // FETCH FRESH USER DATA ON PAGE LOAD
+  useEffect(() => {
+    const fetchFresh = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/users/me`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders(),
+          },
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Failed to refresh profile");
+
+        updateUser({
+          id: data.user.id,
+          name: data.user.name,
+          email: data.user.email,
+          avatar: data.user.avatarUrl ?? null,
+          joinDate: data.user.createdAt,
+          token: localStorage.getItem("auth_token"),
+          stats: data.user.stats || {}
+        });
+
+        // update edit fields
+        setEditName(data.user.name || "");
+        setEditEmail(data.user.email || "");
+
+      } catch (err) {
+        console.error("Profile refresh failed:", err);
+        showError("Could not refresh profile");
+      }
+    };
+
+    fetchFresh();
+  }, []);
 
   const stats = user.stats || {};
   const totalEncryptions = stats.totalEncryptions || 0;
@@ -130,7 +169,9 @@ const ProfilePage = () => {
         ...user,
         name: data.user.name,
         email: data.user.email,
+        stats: data.user.stats || user.stats
       });
+
       setEditMode(false);
       showSuccess('Profile updated successfully!');
     } catch (e) {

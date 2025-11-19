@@ -70,15 +70,27 @@ const SignupPage = () => {
       // Save token
       localStorage.setItem('auth_token', data.token);
 
-      // Update auth context
-      login({
+      // Attach stats (important!)
+      const normalizedUser = {
         id: data.user.id,
         name: data.user.name,
         email: data.user.email,
         avatar: data.user.avatarUrl ?? null,
         joinDate: data.user.createdAt ?? new Date().toISOString(),
         token: data.token,
-      });
+        stats: data.user.stats ?? {
+          points: 0,
+          level: 1,
+          combo: 0,
+          bestCombo: 0,
+          totalEncryptions: 0,
+          totalDecryptions: 0,
+          experiencedCiphers: [],
+        },
+      };
+
+      // Update Auth Context
+      login(normalizedUser);
 
       setSuccess('Account created successfully!');
       navigate('/');
@@ -90,14 +102,12 @@ const SignupPage = () => {
     }
   };
 
-  // REAL Google / GitHub signup – same backend endpoints
   const handleSocialSignup = (provider) => {
     window.location.href = `${API_BASE}/api/auth/${provider}`;
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute w-96 h-96 bg-purple-500/20 rounded-full blur-3xl opacity-20 -top-48 -right-48 animate-pulse" />
         <div className="absolute w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl opacity-20 bottom-0 left-0 animate-pulse" style={{ animationDelay: '1s' }} />
@@ -139,7 +149,6 @@ const SignupPage = () => {
           )}
 
           <form onSubmit={handleSignup} className="space-y-5">
-            {/* Full Name */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-slate-200">
                 Full Name
@@ -159,7 +168,6 @@ const SignupPage = () => {
               </div>
             </div>
 
-            {/* Email */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-slate-200">
                 Email Address
@@ -179,7 +187,6 @@ const SignupPage = () => {
               </div>
             </div>
 
-            {/* Password */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-slate-200">
                 Password
@@ -206,7 +213,6 @@ const SignupPage = () => {
               </div>
             </div>
 
-            {/* Confirm password */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-slate-200">
                 Confirm Password
@@ -233,7 +239,6 @@ const SignupPage = () => {
               </div>
             </div>
 
-            {/* Terms */}
             <div className="flex items-center space-x-2 text-sm">
               <input
                 type="checkbox"
@@ -269,7 +274,6 @@ const SignupPage = () => {
             </button>
           </form>
 
-          {/* Divider */}
           <div className="relative my-8">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-slate-700" />
@@ -281,7 +285,6 @@ const SignupPage = () => {
             </div>
           </div>
 
-          {/* REAL OAuth buttons */}
           <div className="grid grid-cols-2 gap-4 mb-6">
             <button
               type="button"

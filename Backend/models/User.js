@@ -9,14 +9,15 @@ const StatsSchema = new mongoose.Schema({
   bestCombo: { type: Number, default: 0 },
   totalEncryptions: { type: Number, default: 0 },
   totalDecryptions: { type: Number, default: 0 },
-  experiencedCiphers: { type: [String], default: [] }
+  experiencedCiphers: { type: [String], default: [] },
+  completedChallenges: { type: [String], default: [] }, // <-- ADDED THIS LINE
 }, { _id: false });
 
 const UserSchema = new mongoose.Schema({
   name:        { type: String, trim: true, minlength: 1, maxlength: 80 },
   email:       { type: String, required: true, lowercase: true, trim: true, maxlength: 160, unique: true },
   passwordHash:{ type: String },
-  provider:    { type: String, enum: ["local","google","github"], default: "local" },
+  provider:    { type: String, enum: ["local", "google", "github"], default: "local" },
   roles:       { type: [String], default: ["user"] },
   avatarUrl:   { type: String, default: null },
   stats:       { type: StatsSchema, default: () => ({}) },

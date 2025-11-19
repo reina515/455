@@ -5,8 +5,6 @@ import jwt from "jsonwebtoken";
 
 const router = express.Router();
 
-// Make sure Node is >= 18 so global fetch exists.
-// If not, install node-fetch and import it.
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3001";
 
 function createToken(user) {
@@ -24,7 +22,9 @@ function buildFrontendRedirect(user, token) {
   return url.toString();
 }
 
-// Basic auth middleware (used for password change)
+// ----------------------
+// AUTH MIDDLEWARE
+// ----------------------
 function requireAuth(req, res, next) {
   const token = (req.headers.authorization || "").replace("Bearer ", "");
   if (!token) return res.status(401).json({ error: "Unauthorized" });
@@ -37,14 +37,13 @@ function requireAuth(req, res, next) {
   }
 }
 
-// Helper for random password for OAuth-created accounts
 function randomPassword() {
   return "oauth-" + Math.random().toString(36).slice(2, 12);
 }
 
-// ========== EMAIL/PASSWORD AUTH ==========
-
-// POST /api/auth/signup
+// =====================================================
+// EMAIL / PASSWORD SIGNUP
+// =====================================================
 router.post("/signup", async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -58,7 +57,6 @@ router.post("/signup", async (req, res) => {
       return res.status(409).json({ error: "Email already in use" });
     }
 
-    // Virtual "password" field hashes it into passwordHash
     const user = await User.create({ name, email, password });
 
     const token = createToken(user);
@@ -78,7 +76,9 @@ router.post("/signup", async (req, res) => {
   }
 });
 
-// POST /api/auth/login
+// =====================================================
+// LOGIN
+// =====================================================
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -105,7 +105,32 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// PATCH /api/auth/password
+// =====================================================
+// FIX: GET CURRENT USER (PROFILE REFRESH)
+// =====================================================
+router.get("/me", requireAuth, async (req, res) => {      // <<< ADDED
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    res.json({
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        stats: user.stats,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (err) {
+    console.error("GET /me error:", err);
+    res.status(500).json({ error: "Failed to fetch user" });
+  }
+});                                                       // <<< ADDED END
+
+// =====================================================
+// CHANGE PASSWORD
+// =====================================================
 router.patch("/password", requireAuth, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -122,7 +147,7 @@ router.patch("/password", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Current password is incorrect" });
     }
 
-    user.password = newPassword; // uses virtual to re-hash
+    user.password = newPassword;
     await user.save();
 
     res.json({ ok: true });
@@ -132,9 +157,9 @@ router.patch("/password", requireAuth, async (req, res) => {
   }
 });
 
-// ========== GOOGLE OAUTH ==========
-
-// GET /api/auth/google  -> redirect to Google consent
+// =====================================================
+// GOOGLE OAUTH
+// =====================================================
 router.get("/google", (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const redirectUri = process.env.GOOGLE_REDIRECT_URI;
@@ -159,7 +184,6 @@ router.get("/google", (req, res) => {
   res.redirect(url);
 });
 
-// GET /api/auth/google/callback
 router.get("/google/callback", async (req, res) => {
   const code = req.query.code;
   if (!code) {
@@ -224,9 +248,9 @@ router.get("/google/callback", async (req, res) => {
   }
 });
 
-// ========== GITHUB OAUTH ==========
-
-// GET /api/auth/github -> redirect to GitHub consent
+// =====================================================
+// GITHUB OAUTH
+// =====================================================
 router.get("/github", (req, res) => {
   const clientId = process.env.GITHUB_CLIENT_ID;
   const redirectUri = process.env.GITHUB_REDIRECT_URI;
@@ -248,7 +272,6 @@ router.get("/github", (req, res) => {
   res.redirect(url);
 });
 
-// GET /api/auth/github/callback
 router.get("/github/callback", async (req, res) => {
   const code = req.query.code;
   if (!code) {
@@ -256,7 +279,6 @@ router.get("/github/callback", async (req, res) => {
   }
 
   try {
-    // 1) exchange code for access token
     const tokenRes = await fetch(
       "https://github.com/login/oauth/access_token",
       {
@@ -282,7 +304,6 @@ router.get("/github/callback", async (req, res) => {
 
     const accessToken = tokenData.access_token;
 
-    // 2) fetch basic profile
     const userRes = await fetch("https://api.github.com/user", {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -295,8 +316,8 @@ router.get("/github/callback", async (req, res) => {
       throw new Error("Failed to obtain GitHub user");
     }
 
-    // 3) try to get email
     let email = profile.email;
+
     if (!email) {
       const emailsRes = await fetch("https://api.github.com/user/emails", {
         headers: {
@@ -305,6 +326,7 @@ router.get("/github/callback", async (req, res) => {
           Accept: "application/vnd.github+json",
         },
       });
+
       if (emailsRes.ok) {
         const emails = await emailsRes.json();
         const primary = emails.find((e) => e.primary && e.verified);

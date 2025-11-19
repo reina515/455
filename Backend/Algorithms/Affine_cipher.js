@@ -57,25 +57,36 @@ export function affineCrack(ciphertext, plain1 = "E", plain2 = "T", topK = 4) {
   for (const ch of ciphertext.toUpperCase()) {
     if (ch >= "A" && ch <= "Z") counts.set(ch, (counts.get(ch) || 0) + 1);
   }
-  const top = [...counts.entries()].sort((a,b)=>b[1]-a[1]).map(([ch])=>ch);
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([ch]) => ch);
   if (top.length < 1) throw new Error("No letters to analyze.");
 
-  // try pairings among topK most frequent ciphertext letters
-  const candidates = [];
+  // helper to get 0..25 index
   const X = (ch) => ch.toUpperCase().charCodeAt(0) - 65;
-  const targetX1 = X(plain1), targetX2 = X(plain2);
+  const P = (ch) => ch.toUpperCase().charCodeAt(0) - 65;
 
+  const targetP1 = P(plain1);
+  const targetP2 = P(plain2);
+
+  const candidates = [];
   const limit = Math.min(topK, top.length);
-  for (let i=0;i<limit;i++){
-    for (let j=0;j<limit;j++){
-      if (i===j) continue;
+
+  // try pairings among topK most frequent ciphertext letters
+  for (let i = 0; i < limit; i++) {
+    for (let j = 0; j < limit; j++) {
+      if (i === j) continue;
       try {
-        const y1 = X(top[i]), y2 = X(top[j]);
-        const a = mod((y1 - y2) * modInv(targetX1 - targetX2, A));
+        const C1 = X(top[i]);
+        const C2 = X(top[j]);
+
+        // solve for a: (C1 - C2) = a (P1 - P2) mod 26
+        const a = mod((C1 - C2) * modInv(targetP1 - targetP2, A));
         if (gcd(a, A) !== 1) continue; // just in case
-        const b = mod(y1 - a * targetX1);
+
+        // solve for b: C1 = a P1 + b mod 26
+        const b = mod(C1 - a * targetP1);
+
         const preview = affineDecrypt(ciphertext, a, b);
-        candidates.push({a, b, preview});
+        candidates.push({ a, b, preview });
       } catch (e) {
         // skip pair if inversion failed
       }
@@ -90,14 +101,12 @@ export function affineCrack(ciphertext, plain1 = "E", plain2 = "T", topK = 4) {
       for (let bb = 0; bb < A; bb++) {
         try {
           const preview = affineDecrypt(ciphertext, aa, bb);
-          candidates.push({a: aa, b: bb, preview});
+          candidates.push({ a: aa, b: bb, preview });
         } catch (e) { /* skip */ }
       }
     }
   }
 
-  // return top N candidates (caller can inspect)
+  // return top N candidates for inspection
   return { candidates: candidates.slice(0, 10) };
 }
-
-
