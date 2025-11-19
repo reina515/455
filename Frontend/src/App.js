@@ -1,3 +1,4 @@
+// Frontend/src/App.js
 import React from "react";
 import {
   BrowserRouter as Router,
@@ -10,9 +11,12 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import HomePage from "./pages/HomePage";
 import CipherLabPage from "./pages/CipherLabPage";
 import MissionsPage from "./pages/MissionsPage";
+import MissionAttemptPage from "./pages/MissionAttemptPage";
 import ProfilePage from "./pages/ProfilePage";
 import OAuthCallbackPage from "./pages/OAuthCallbackPage";
 
@@ -47,6 +51,8 @@ function App() {
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
             {/* OAuth callback (public, used after Google/GitHub redirect) */}
             <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
@@ -60,6 +66,10 @@ function App() {
             <Route
               path="/missions"
               element={<ProtectedRoute element={<MissionsPage />} />}
+            />
+            <Route
+              path="/mission-attempt"
+              element={<ProtectedRoute element={<MissionAttemptPage />} />}
             />
             <Route
               path="/profile"
