@@ -70,7 +70,7 @@ const SignupPage = () => {
       // Save token
       localStorage.setItem('auth_token', data.token);
 
-      // Attach stats (important!)
+      // Attach stats 
       const normalizedUser = {
         id: data.user.id,
         name: data.user.name,

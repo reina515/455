@@ -1,5 +1,5 @@
 // Frontend/src/pages/HomePage.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Shield,
   Lock,
@@ -13,12 +13,56 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../contexts/ThemeContext';
+
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
+// Helper for Authorization header
+function authHeaders() {
+  const t = localStorage.getItem('auth_token');
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
 
 const HomePage = () => {
-  const { user, logout, loading } = useAuth();
+  const { user, updateUser, logout, loading } = useAuth();
+  const { theme, currentTheme, toggleTheme } = useTheme(); // ✅ Use centralized theme
   const navigate = useNavigate();
-  const [theme, setTheme] = useState('dark');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  // ✅ FETCH FRESH USER DATA ON PAGE LOAD (same as ProfilePage)
+  useEffect(() => {
+    const fetchFresh = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/users/me`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders(),
+          },
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Failed to refresh profile");
+
+        updateUser({
+          id: data.user.id,
+          name: data.user.name,
+          email: data.user.email,
+          avatar: data.user.avatarUrl ?? null,
+          joinDate: data.user.createdAt,
+          token: localStorage.getItem("auth_token"),
+          stats: data.user.stats || {}
+        });
+
+      } catch (err) {
+        console.error("HomePage refresh failed:", err);
+      }
+    };
+
+    if (user) {
+      fetchFresh();
+    }
+  }, []); // Run once on mount
 
   // Loading
   if (loading) return null;
@@ -38,10 +82,11 @@ const HomePage = () => {
     totalEncryptions: 0,
     totalDecryptions: 0,
     experiencedCiphers: [],
+    completedChallenges: [],
     ...(user.stats || {}),
   };
 
-  // 🔥🔥 NEW: Live achievement scoring (same logic as ProfilePage)
+  // Achievement scoring (same logic as ProfilePage)
   const achievementList = [
     {
       id: 'first_steps',
@@ -63,38 +108,8 @@ const HomePage = () => {
 
   const achievementsUnlocked = achievementList.filter(a => a.unlocked).length;
 
-  // 🔥 Missions logic
-  // We count missions same way profile does:
-  // (you can change this later if Missions has custom logic)
+  // Missions completed
   const missionsCompleted = stats.completedChallenges?.length || 0;
-
-  // THEMES
-  const themes = {
-    dark: {
-      bg: 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900',
-      text: 'text-white',
-      textMuted: 'text-slate-400',
-      card: 'bg-slate-800/50',
-      cardBorder: 'border-slate-700/50',
-      cardHover: 'hover:bg-slate-700/50',
-      header: 'bg-slate-900/80',
-      glow: 'blur-3xl opacity-20',
-      glowColors: ['bg-blue-500/20', 'bg-purple-500/20', 'bg-cyan-500/20'],
-    },
-    light: {
-      bg: 'bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100',
-      text: 'text-slate-900',
-      textMuted: 'text-slate-600',
-      card: 'bg-white/80',
-      cardBorder: 'border-slate-200',
-      cardHover: 'hover:bg-white',
-      header: 'bg-white/80',
-      glow: 'blur-3xl opacity-30',
-      glowColors: ['bg-blue-400/30', 'bg-purple-400/30', 'bg-cyan-400/30'],
-    },
-  };
-
-  const currentTheme = themes[theme];
 
   // Profile dropdown UI
   const ProfileMenu = () => (
@@ -156,14 +171,14 @@ const HomePage = () => {
       {/* GLOW BACKGROUND */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
-          className={`absolute w-96 h-96 ${currentTheme.glowColors[0]} rounded-full ${currentTheme.glow} -top-48 -left-48 animate-pulse`}
+          className={`absolute w-96 h-96 ${currentTheme.glowColors?.[0] || 'bg-blue-500/20'} rounded-full ${currentTheme.glow} -top-48 -left-48 animate-pulse`}
         />
         <div
-          className={`absolute w-96 h-96 ${currentTheme.glowColors[1]} rounded-full ${currentTheme.glow} top-1/2 right-0 animate-pulse`}
+          className={`absolute w-96 h-96 ${currentTheme.glowColors?.[1] || 'bg-purple-500/20'} rounded-full ${currentTheme.glow} top-1/2 right-0 animate-pulse`}
           style={{ animationDelay: '1s' }}
         />
         <div
-          className={`absolute w-96 h-96 ${currentTheme.glowColors[2]} rounded-full ${currentTheme.glow} bottom-0 left-1/3 animate-pulse`}
+          className={`absolute w-96 h-96 ${currentTheme.glowColors?.[2] || 'bg-cyan-500/20'} rounded-full ${currentTheme.glow} bottom-0 left-1/3 animate-pulse`}
           style={{ animationDelay: '2s' }}
         />
       </div>
@@ -210,7 +225,7 @@ const HomePage = () => {
 
               {/* THEME SWITCH */}
               <button
-                onClick={() => setTheme(t => (t === 'dark' ? 'light' : 'dark'))}
+                onClick={toggleTheme}
                 className={`p-2 ${
                   theme === 'dark'
                     ? 'bg-slate-700 hover:bg-slate-600'
@@ -225,22 +240,24 @@ const HomePage = () => {
               </button>
 
               {/* COMBO */}
-              <div
-                className={`flex items-center px-4 py-2 border rounded-full ${
-                  theme === 'dark'
-                    ? 'bg-orange-500/20 border-orange-500/40'
-                    : 'bg-orange-100 border-orange-300'
-                }`}
-              >
-                <Flame
-                  className={`w-4 h-4 ${
-                    theme === 'dark' ? 'text-orange-400' : 'text-orange-600'
+              {stats.combo > 0 && (
+                <div
+                  className={`flex items-center px-4 py-2 border rounded-full ${
+                    theme === 'dark'
+                      ? 'bg-orange-500/20 border-orange-500/40'
+                      : 'bg-orange-100 border-orange-300'
                   }`}
-                />
-                <span className={`${currentTheme.text} font-bold ml-2`}>
-                  {stats.combo}x
-                </span>
-              </div>
+                >
+                  <Flame
+                    className={`w-4 h-4 ${
+                      theme === 'dark' ? 'text-orange-400' : 'text-orange-600'
+                    }`}
+                  />
+                  <span className={`${currentTheme.text} font-bold ml-2`}>
+                    {stats.combo}x
+                  </span>
+                </div>
+              )}
 
               {/* LEVEL */}
               <div
@@ -321,7 +338,7 @@ const HomePage = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
           <button
             onClick={() => navigate('/cipherlab')}
-            className={`group relative ${currentTheme.card} backdrop-blur-xl border ${currentTheme.cardBorder} rounded-2xl p-8 hover:scale-105 transition-all duration-300 shadow-lg ${currentTheme.cardHover}`}
+            className={`group relative ${currentTheme.card} backdrop-blur-xl border ${currentTheme.cardBorder} rounded-2xl p-8 hover:scale-105 transition-all duration-300 shadow-lg ${currentTheme.cardHover || ''}`}
           >
             <div className="relative flex flex-col items-center text-center">
               <div
@@ -344,7 +361,7 @@ const HomePage = () => {
 
           <button
             onClick={() => navigate('/missions')}
-            className={`group relative ${currentTheme.card} backdrop-blur-xl border ${currentTheme.cardBorder} rounded-2xl p-8 hover:scale-105 transition-all duration-300 shadow-lg ${currentTheme.cardHover}`}
+            className={`group relative ${currentTheme.card} backdrop-blur-xl border ${currentTheme.cardBorder} rounded-2xl p-8 hover:scale-105 transition-all duration-300 shadow-lg ${currentTheme.cardHover || ''}`}
           >
             <div className="relative flex flex-col items-center text-center">
               <div
@@ -367,7 +384,7 @@ const HomePage = () => {
 
           <button
             onClick={() => navigate('/profile')}
-            className={`group relative ${currentTheme.card} backdrop-blur-xl border ${currentTheme.cardBorder} rounded-2xl p-8 hover:scale-105 transition-all duration-300 shadow-lg ${currentTheme.cardHover}`}
+            className={`group relative ${currentTheme.card} backdrop-blur-xl border ${currentTheme.cardBorder} rounded-2xl p-8 hover:scale-105 transition-all duration-300 shadow-lg ${currentTheme.cardHover || ''}`}
           >
             <div className="relative flex flex-col items-center text-center">
               <div
@@ -444,7 +461,7 @@ const HomePage = () => {
 const StatCard = ({ theme, currentTheme, label, value, colorFrom, colorTo }) => {
   return (
     <div
-      className={`backdrop-blur-xl ${currentTheme.card} border ${currentTheme.cardBorder} rounded-2xl p-6 shadow-lg ${currentTheme.cardHover}`}
+      className={`backdrop-blur-xl ${currentTheme.card} border ${currentTheme.cardBorder} rounded-2xl p-6 shadow-lg ${currentTheme.cardHover || ''}`}
     >
       <div
         className={`text-4xl font-black bg-gradient-to-r ${colorFrom} ${colorTo} bg-clip-text text-transparent`}

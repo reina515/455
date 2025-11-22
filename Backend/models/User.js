@@ -10,7 +10,7 @@ const StatsSchema = new mongoose.Schema({
   totalEncryptions: { type: Number, default: 0 },
   totalDecryptions: { type: Number, default: 0 },
   experiencedCiphers: { type: [String], default: [] },
-  completedChallenges: { type: [String], default: [] }, // <-- ADDED THIS LINE
+  completedChallenges: { type: [String], default: [] }, 
 }, { _id: false });
 
 const UserSchema = new mongoose.Schema({
@@ -24,7 +24,7 @@ const UserSchema = new mongoose.Schema({
   lastLoginAt: { type: Date },
 }, { timestamps: true });
 
-/** 🔥 Automatically hash password when setting user.password */
+/* Automatically hash password when setting user.password */
 UserSchema.virtual("password").set(function(password) {
   this._password = password;
   this.passwordHash = bcrypt.hashSync(password, 10);
