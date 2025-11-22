@@ -205,13 +205,16 @@ const CipherLabPage = () => {
     const newLevel = Math.floor(newPoints / 500) + 1;
     const newCombo = (currentStats.combo || 0) + 1;
 
-    const newStats = {
-      ...currentStats,
-      points: newPoints,
-      level: newLevel,
-      combo: newCombo,
-      bestCombo: Math.max(newCombo, currentStats.bestCombo || 0),
-    };
+const newStats = {
+  ...currentStats,
+  points: newPoints,
+  level: newLevel,
+  combo: newCombo,
+  bestCombo: Math.max(newCombo, currentStats.bestCombo || 0),
+  totalEncryptions: currentStats.totalEncryptions || 0,
+  totalDecryptions: currentStats.totalDecryptions || 0,
+  experiencedCiphers: currentStats.experiencedCiphers || [],
+};
 
     console.log('🏆 Awarding points:', {
       points,
