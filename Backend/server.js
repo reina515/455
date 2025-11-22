@@ -25,9 +25,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ========== ROUTERS ==========
-app.use("/api/auth", authRouter);
-app.use("/api/users", usersRouter);
+app.use("/api/auth", authRouter);   
+app.use("/api/users", usersRouter); 
 
 // Health
 app.get("/", (_, res) => res.send("Backend is running successfully!"));
