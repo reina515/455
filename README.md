@@ -831,11 +831,6 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ---
 
-## 📧 Contact
-
-**Ziad Abillama** - [@ZiadAbillama](https://github.com/ZiadAbillama)
-
-**Project Link**: [https://github.com/ZiadAbillama/classical-encryption-ciphers](https://github.com/ZiadAbillama/classical-encryption-ciphers)
 
 ---
 
