@@ -841,7 +841,7 @@ This project is open source and available under the [MIT License](LICENSE).
 
 <div align="center">
 
-**Made with ❤️ and ☕ by Ziad Abillama**
+
 
 ⭐ **Star this repo if you find it helpful!** ⭐
 
