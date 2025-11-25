@@ -13,6 +13,7 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import HomePage from "./pages/HomePage";
 import CipherLabPage from "./pages/CipherLabPage";
+import CipherInfoPage from "./pages/CipherInfoPage";
 import MissionsPage from "./pages/MissionsPage";
 import MissionAttemptPage from "./pages/MissionAttemptPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -58,6 +59,10 @@ function App() {
             <Route
               path="/cipherlab"
               element={<ProtectedRoute element={<CipherLabPage />} />}
+            />
+            <Route
+              path="/cipher-info"
+              element={<ProtectedRoute element={<CipherInfoPage />} />}
             />
             <Route
               path="/missions"

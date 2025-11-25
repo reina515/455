@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Lock, Unlock, Key, Grid3x3, Hash, Calculator, Copy, Check, Zap,
-  Trophy, Sparkles, CheckCircle2, Sun, Moon, Flame
+  Trophy, Sparkles, CheckCircle2, Sun, Moon, Flame, Upload, FileText, X, Download
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import mammoth from 'mammoth';
+import { Document, Paragraph, Packer, TextRun } from 'docx';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
+import pdfjsWorker from 'pdfjs-dist/legacy/build/pdf.worker.entry';
 
-// ===== API Configuration =====
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+
+//API Configuration
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:3000";
 
 // POST JSON helper
@@ -26,7 +34,7 @@ async function postJSON(path, body) {
 async function saveStatsToBackend(user, newStats) {
   const token = localStorage.getItem("auth_token");
   if (!token) {
-    console.warn("❌ No auth token found, cannot save stats");
+    console.warn(" No auth token found, cannot save stats");
     return null;
   }
 
@@ -45,14 +53,14 @@ async function saveStatsToBackend(user, newStats) {
     const data = await res.json();
     
     if (!res.ok) {
-      console.error("❌ Backend returned error:", data);
+      console.error(" Backend returned error:", data);
       throw new Error(data.error || "Failed to save stats");
     }
     
-    console.log("✅ Backend saved stats:", data.stats);
+    console.log("Backend saved stats:", data.stats);
     return data.stats;
   } catch (error) {
-    console.error("❌ Error saving stats to backend:", error);
+    console.error("Error saving stats to backend:", error);
     return null;
   }
 }
@@ -61,6 +69,7 @@ const CipherLabPage = () => {
   const { user, updateUser } = useAuth();
   const { theme, currentTheme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Get fresh stats from user context
   const stats = {
@@ -74,7 +83,7 @@ const CipherLabPage = () => {
     ...(user?.stats || {}),
   };
 
-  const [selectedCipher, setSelectedCipher] = useState(null);
+  const [selectedCipher, setSelectedCipher] = useState(location.state?.cipher || null);
   const [inputText, setInputText] = useState('');
   const [outputText, setOutputText] = useState('');
   const [mode, setMode] = useState('encrypt');
@@ -82,6 +91,13 @@ const CipherLabPage = () => {
   const [notification, setNotification] = useState(null);
   const [recentReward, setRecentReward] = useState(null);
   const [lastProcessed, setLastProcessed] = useState('');
+  
+  // File Upload States
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [fileName, setFileName] = useState('');
+  const [fileType, setFileType] = useState('');
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [inputMode, setInputMode] = useState('text'); // 'text' or 'file'
 
   // Cipher States
   const [affineA, setAffineA] = useState(5);
@@ -186,6 +202,226 @@ const CipherLabPage = () => {
     setTimeout(() => setNotification(null), 3000);
   };
 
+  // File Upload Handler
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+    
+    // Accept TXT, DOC, DOCX, and PDF files
+    if (!['.txt', '.doc', '.docx', '.pdf'].includes(fileExtension)) {
+      showNotification('⚠️ Please upload a TXT, Word document (.doc, .docx), or PDF file', 'error');
+      return;
+    }
+
+    setFileName(file.name);
+    setFileType(fileExtension);
+    setIsProcessingFile(true);
+
+    try {
+      let extractedText = '';
+
+      if (fileExtension === '.txt') {
+        // Read text file directly
+        extractedText = await file.text();
+      } else if (fileExtension === '.doc' || fileExtension === '.docx') {
+        // Extract text from Word document
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        extractedText = result.value;
+      } else if (fileExtension === '.pdf') {
+        // Extract text from PDF
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+          const pdf = await loadingTask.promise;
+          let fullText = '';
+          
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map(item => item.str).join(' ');
+            fullText += pageText + '\n';
+          }
+          
+          extractedText = fullText.trim();
+          
+          if (!extractedText) {
+            showNotification('⚠️ No text found in PDF. The PDF might be image-based.', 'error');
+            setIsProcessingFile(false);
+            return;
+          }
+        } catch (pdfError) {
+          console.error('PDF processing error:', pdfError);
+          showNotification('❌ Error reading PDF: ' + pdfError.message, 'error');
+          setIsProcessingFile(false);
+          return;
+        }
+      }
+
+      if (!extractedText.trim()) {
+        showNotification('⚠️ File appears to be empty', 'error');
+        setIsProcessingFile(false);
+        return;
+      }
+
+      setInputText(extractedText);
+      setUploadedFile(file);
+      setInputMode('file');
+      showNotification(`📄 File loaded: ${file.name} (${extractedText.length} characters)`, 'success');
+    } catch (error) {
+      console.error('Error reading file:', error);
+      showNotification(`❌ Error reading file: ${error.message}`, 'error');
+    } finally {
+      setIsProcessingFile(false);
+    }
+  };
+
+  // Remove uploaded file
+  const handleRemoveFile = () => {
+    setUploadedFile(null);
+    setFileName('');
+    setFileType('');
+    setInputText('');
+    setOutputText('');
+    setInputMode('text');
+  };
+
+  // Clear inputs for new operation while keeping mode selection
+  const handleClearForNewInput = () => {
+    if (inputMode === 'file') {
+      setUploadedFile(null);
+      setFileName('');
+      setFileType('');
+    }
+    setInputText('');
+    setOutputText('');
+    setLastProcessed('');
+  };
+
+  // Download processed file with original format preserved
+  const handleDownloadFile = async () => {
+    if (!outputText || !fileName) return;
+
+    const baseFileName = fileName.substring(0, fileName.lastIndexOf('.'));
+    const suffix = mode === 'encrypt' ? 'encrypted' : 'decrypted';
+
+    try {
+      if (fileType === '.txt') {
+        // Simple text file
+        const processedFileName = `${baseFileName}_${suffix}.txt`;
+        const blob = new Blob([outputText], { type: 'text/plain;charset=utf-8' });
+        downloadBlob(blob, processedFileName);
+      } 
+      else if (fileType === '.docx' || fileType === '.doc') {
+        // Create new DOCX with processed text
+        const processedFileName = `${baseFileName}_${suffix}.docx`;
+        const doc = new Document({
+          sections: [{
+            properties: {},
+            children: outputText.split('\n').map(line => 
+              new Paragraph({
+                children: [new TextRun(line)]
+              })
+            )
+          }]
+        });
+        
+        const blob = await Packer.toBlob(doc);
+        downloadBlob(blob, processedFileName);
+      }
+      else if (fileType === '.pdf') {
+        // Create new PDF with processed text
+        const processedFileName = `${baseFileName}_${suffix}.pdf`;
+        const pdfDoc = await PDFDocument.create();
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        
+        const lines = outputText.split('\n');
+        const fontSize = 12;
+        const lineHeight = fontSize * 1.2;
+        const margin = 50;
+        const pageWidth = 595.28; // A4 width in points
+        const pageHeight = 841.89; // A4 height in points
+        const maxWidth = pageWidth - 2 * margin;
+        
+        let page = pdfDoc.addPage([pageWidth, pageHeight]);
+        let yPosition = pageHeight - margin;
+        
+        for (const line of lines) {
+          // Word wrap if line is too long
+          const words = line.split(' ');
+          let currentLine = '';
+          
+          for (const word of words) {
+            const testLine = currentLine + (currentLine ? ' ' : '') + word;
+            const textWidth = font.widthOfTextAtSize(testLine, fontSize);
+            
+            if (textWidth > maxWidth && currentLine) {
+              // Draw current line and start new one
+              page.drawText(currentLine, {
+                x: margin,
+                y: yPosition,
+                size: fontSize,
+                font: font,
+                color: rgb(0, 0, 0)
+              });
+              yPosition -= lineHeight;
+              currentLine = word;
+              
+              // Add new page if needed
+              if (yPosition < margin) {
+                page = pdfDoc.addPage([pageWidth, pageHeight]);
+                yPosition = pageHeight - margin;
+              }
+            } else {
+              currentLine = testLine;
+            }
+          }
+          
+          // Draw remaining text
+          if (currentLine) {
+            page.drawText(currentLine, {
+              x: margin,
+              y: yPosition,
+              size: fontSize,
+              font: font,
+              color: rgb(0, 0, 0)
+            });
+            yPosition -= lineHeight;
+          }
+          
+          // Add new page if needed
+          if (yPosition < margin) {
+            page = pdfDoc.addPage([pageWidth, pageHeight]);
+            yPosition = pageHeight - margin;
+          }
+        }
+        
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        downloadBlob(blob, processedFileName);
+      }
+      
+      showNotification(`✅ Downloaded: ${baseFileName}_${suffix}${fileType}`, 'success');
+    } catch (error) {
+      console.error('Error creating file:', error);
+      showNotification('❌ Error creating download file', 'error');
+    }
+  };
+
+  // Helper function to trigger download
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // Copy to Clipboard
   const copyToClipboard = async () => {
     if (outputText || euclidResult) {
@@ -196,7 +432,7 @@ const CipherLabPage = () => {
   };
 
   // Award Points with Database Integration
-  // ✅ FIX: Accept baseStats parameter to avoid using stale user data
+  //Accept baseStats parameter to avoid using stale user data
   const awardPoints = async (points, reason, baseStats = null) => {
     // Use provided baseStats or fallback to user stats
     const currentStats = baseStats || user?.stats || stats;
@@ -245,7 +481,7 @@ const newStats = {
   };
 
   // Increment Action Stats (Encrypt/Decrypt counter)
-  // ✅ FIX: Return the updated stats so awardPoints can use them
+  //Return the updated stats so awardPoints can use them
   const incrementActionStats = async (cipherId) => {
     // Get fresh stats from user
     const currentStats = user?.stats || stats;
@@ -275,23 +511,25 @@ const newStats = {
       const savedStats = await saveStatsToBackend(user, newStats);
       if (savedStats) {
         updateUser({ ...user, stats: savedStats });
-        return savedStats; // ✅ Return the saved stats
+        return savedStats; //Return the saved stats
       }
     } catch (err) {
       console.error("Failed to save action stats:", err);
     }
     
-    return newStats; // ✅ Return newStats as fallback
+    return newStats; //Return newStats as fallback
   };
 
   // Main Process Handler
   const handleProcess = async () => {
     if (!selectedCipher) return;
 
-    // Validation: Check if input is empty (except for Euclid)
-    if (selectedCipher !== 'euclid' && !inputText.trim()) {
-      showNotification('⚠️ Please enter some text to process!', 'error');
-      return;
+    // Validation: Require file upload or text input
+    if (selectedCipher !== 'euclid') {
+      if (!uploadedFile && !inputText.trim()) {
+        showNotification('⚠️ Please upload a file or enter text to process!', 'error');
+        return;
+      }
     }
 
     // Duplicate Prevention
@@ -339,7 +577,9 @@ const newStats = {
               totalEncryptions: (user?.stats?.totalEncryptions || 0),
               totalDecryptions: (user?.stats?.totalDecryptions || 0),
             });
-            await awardPoints(50, 'Code Cracked', crackedStats || user?.stats || stats);
+            // Award extra points for cracking with file upload
+            const crackPoints = uploadedFile ? 65 : 50;
+            await awardPoints(crackPoints, 'Code Cracked', crackedStats || user?.stats || stats);
             return;
           }
 
@@ -409,7 +649,7 @@ const newStats = {
             `\nBézout: ${euclidA}·${r.coefficients.x} + ${euclidM}·${r.coefficients.y} = ${r.gcd}`
           );
 
-          // ✅ FIX: Handle Euclid stats separately (no encrypt/decrypt mode)
+          // Handle Euclid stats separately (no encrypt/decrypt mode)
           const currentStats = user?.stats || stats;
           const euclidStats = {
             ...currentStats,
@@ -441,22 +681,126 @@ const newStats = {
 
       console.log("🎮 Processing complete, now updating stats...");
 
-      // ✅ FIX: Wait for incrementActionStats and get the updated stats
+      //Wait for incrementActionStats and get the updated stats
       const updatedStats = await incrementActionStats(selectedCipher);
 
-      const basePoints = mode === 'encrypt' ? 10 : 10;
+      // Award bonus points for file uploads (15 points instead of 10)
+      const basePoints = uploadedFile ? 15 : 10;
       const comboBonus = (updatedStats.combo || 0) * 1.5;
+      const pointReason = uploadedFile 
+        ? `${mode === 'encrypt' ? 'Encrypted' : 'Decrypted'} (File Bonus!)`
+        : mode === 'encrypt' ? 'Encrypted' : 'Decrypted';
 
       console.log("💰 About to award points:", basePoints + comboBonus);
 
-      // ✅ FIX: Pass the updated stats to awardPoints
+      //Pass the updated stats to awardPoints
       await awardPoints(
         basePoints + comboBonus,
-        mode === 'encrypt' ? 'Encrypted' : 'Decrypted',
-        updatedStats // ← Pass the fresh stats!
+        pointReason,
+        updatedStats //Pass the fresh stats!
       );
 
-      console.log("✅ All stats updates complete!");
+      console.log(" All stats updates complete!");
+
+      // Auto-download file if one was uploaded with format preservation
+      if (uploadedFile && fileName) {
+        const baseFileName = fileName.substring(0, fileName.lastIndexOf('.'));
+        const suffix = mode === 'encrypt' ? 'encrypted' : 'decrypted';
+
+        try {
+          if (fileType === '.txt') {
+            const processedFileName = `${baseFileName}_${suffix}.txt`;
+            const blob = new Blob([result], { type: 'text/plain;charset=utf-8' });
+            downloadBlob(blob, processedFileName);
+          } 
+          else if (fileType === '.docx' || fileType === '.doc') {
+            const processedFileName = `${baseFileName}_${suffix}.docx`;
+            const doc = new Document({
+              sections: [{
+                properties: {},
+                children: result.split('\n').map(line => 
+                  new Paragraph({
+                    children: [new TextRun(line)]
+                  })
+                )
+              }]
+            });
+            
+            const blob = await Packer.toBlob(doc);
+            downloadBlob(blob, processedFileName);
+          }
+          else if (fileType === '.pdf') {
+            const processedFileName = `${baseFileName}_${suffix}.pdf`;
+            const pdfDoc = await PDFDocument.create();
+            const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+            
+            const lines = result.split('\n');
+            const fontSize = 12;
+            const lineHeight = fontSize * 1.2;
+            const margin = 50;
+            const pageWidth = 595.28;
+            const pageHeight = 841.89;
+            const maxWidth = pageWidth - 2 * margin;
+            
+            let page = pdfDoc.addPage([pageWidth, pageHeight]);
+            let yPosition = pageHeight - margin;
+            
+            for (const line of lines) {
+              const words = line.split(' ');
+              let currentLine = '';
+              
+              for (const word of words) {
+                const testLine = currentLine + (currentLine ? ' ' : '') + word;
+                const textWidth = font.widthOfTextAtSize(testLine, fontSize);
+                
+                if (textWidth > maxWidth && currentLine) {
+                  page.drawText(currentLine, {
+                    x: margin,
+                    y: yPosition,
+                    size: fontSize,
+                    font: font,
+                    color: rgb(0, 0, 0)
+                  });
+                  yPosition -= lineHeight;
+                  currentLine = word;
+                  
+                  if (yPosition < margin) {
+                    page = pdfDoc.addPage([pageWidth, pageHeight]);
+                    yPosition = pageHeight - margin;
+                  }
+                } else {
+                  currentLine = testLine;
+                }
+              }
+              
+              if (currentLine) {
+                page.drawText(currentLine, {
+                  x: margin,
+                  y: yPosition,
+                  size: fontSize,
+                  font: font,
+                  color: rgb(0, 0, 0)
+                });
+                yPosition -= lineHeight;
+              }
+              
+              if (yPosition < margin) {
+                page = pdfDoc.addPage([pageWidth, pageHeight]);
+                yPosition = pageHeight - margin;
+              }
+            }
+            
+            const pdfBytes = await pdfDoc.save();
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            downloadBlob(blob, processedFileName);
+          }
+          
+          showNotification(`✅ File downloaded: ${baseFileName}_${suffix}${fileType}`, 'success');
+        } catch (error) {
+          console.error('Error creating file:', error);
+          showNotification('❌ Error creating download file', 'error');
+        }
+      }
 
     } catch (e) {
       console.error("Process error:", e);
@@ -798,11 +1142,9 @@ const newStats = {
               onClick={() => {
                 if (selectedCipher) {
                   setSelectedCipher(null);
-                  setInputText('');
-                  setOutputText('');
+                  handleClearForNewInput();
                   setEuclidResult('');
                   setShowCrack(false);
-                  setLastProcessed('');
                 } else {
                   navigate('/');
                 }
@@ -856,7 +1198,11 @@ const newStats = {
                 return (
                   <button
                     key={cipher.id}
-                    onClick={() => setSelectedCipher(cipher.id)}
+                    onClick={() => {
+                      setSelectedCipher(cipher.id);
+                      // Clear file and inputs when switching ciphers
+                      handleClearForNewInput();
+                    }}
                     className={`group relative backdrop-blur-xl ${currentTheme.card} border ${currentTheme.cardBorder} rounded-2xl p-6 hover:scale-105 transition-all duration-300 shadow-lg ${currentTheme.cardHover || ''}`}
                   >
                     {tried && (
@@ -944,45 +1290,179 @@ const newStats = {
               {/* Input/Output */}
               {selectedCipher !== 'euclid' && (
                 <div className="space-y-4">
-                  <div>
-                    <label className={`block ${currentTheme.text} font-bold mb-2`}>Input Text</label>
-                    <textarea
-                      value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
-                      className={`w-full h-32 ${currentTheme.input} border-2 ${currentTheme.cardBorder} ${currentTheme.inputFocus} rounded-xl px-4 py-3 ${currentTheme.text} placeholder-opacity-30 focus:outline-none resize-none`}
-                      placeholder="Enter different text each time to earn points..."
-                    />
+                  {/* Input Mode Toggle */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => {
+                          setInputMode('text');
+                          handleClearForNewInput();
+                        }}
+                        className={`px-4 py-2 rounded-lg font-bold transition-all ${
+                          inputMode === 'text'
+                            ? `bg-gradient-to-r ${cipher.gradient} text-white`
+                            : theme === 'dark'
+                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                        }`}
+                      >
+                        📝 Text Input
+                      </button>
+                      <button
+                        onClick={() => {
+                          setInputMode('file');
+                          setInputText('');
+                          setOutputText('');
+                        }}
+                        className={`px-4 py-2 rounded-lg font-bold transition-all ${
+                          inputMode === 'file'
+                            ? `bg-gradient-to-r ${cipher.gradient} text-white`
+                            : theme === 'dark'
+                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                        }`}
+                      >
+                        📁 File Upload
+                      </button>
+                    </div>
+                    {(inputText || uploadedFile) && (
+                      <button
+                        onClick={handleClearForNewInput}
+                        className={`px-4 py-2 rounded-lg font-bold transition-all ${
+                          theme === 'dark'
+                            ? 'bg-red-700 hover:bg-red-600'
+                            : 'bg-red-500 hover:bg-red-600'
+                        } text-white`}
+                      >
+                        🗑️ Clear
+                      </button>
+                    )}
                   </div>
 
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className={`block ${currentTheme.text} font-bold`}>Output Text</label>
-                      {outputText && (
-                        <button
-                          onClick={copyToClipboard}
-                          className={`flex items-center space-x-2 px-4 py-2 ${theme === 'dark' ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-200 hover:bg-slate-300'} rounded-lg ${currentTheme.text} transition-all`}
-                        >
-                          {copied ? (
-                            <>
-                              <Check className="w-4 h-4 text-green-500" />
-                              <span className="text-green-500 font-bold">Copied!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-4 h-4" />
-                              <span className="font-bold">Copy</span>
-                            </>
-                          )}
-                        </button>
-                      )}
+                  {/* File Upload Section - Only show in file mode */}
+                  {inputMode === 'file' && (
+                    <div className={`${currentTheme.card} border-2 ${currentTheme.cardBorder} rounded-xl p-4`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2">
+                        <Upload className="w-5 h-5 text-cyan-500" />
+                        <label className={`${currentTheme.text} font-bold`}>
+                          File Upload
+                        </label>
+                        <span className="px-2 py-1 bg-gradient-to-r from-amber-500 to-orange-600 text-white text-xs font-bold rounded-lg">
+                          +15 Points
+                        </span>
+                      </div>
                     </div>
-                    <textarea
-                      value={outputText}
-                      readOnly
-                      className={`w-full h-32 ${theme === 'dark' ? 'bg-gradient-to-br from-slate-800 to-slate-700' : 'bg-gradient-to-br from-slate-50 to-slate-100'} border-2 ${currentTheme.cardBorder} rounded-xl px-4 py-3 ${currentTheme.text} font-bold focus:outline-none resize-none`}
-                      placeholder="Result will appear here..."
-                    />
+                    
+                    {!uploadedFile ? (
+                      <label className={`flex flex-col items-center justify-center w-full h-24 border-2 border-dashed ${currentTheme.cardBorder} rounded-lg cursor-pointer ${theme === 'dark' ? 'hover:bg-slate-800' : 'hover:bg-slate-50'} transition-all`}>
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          <FileText className={`w-8 h-8 mb-2 ${currentTheme.textMuted}`} />
+                          <p className={`text-sm ${currentTheme.textMuted}`}>
+                            <span className="font-bold">Click to upload</span> or drag and drop
+                          </p>
+                          <p className={`text-xs ${currentTheme.textMuted}`}>
+                            TXT, DOC, DOCX, or PDF files
+                          </p>
+                        </div>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept=".txt,.doc,.docx,.pdf"
+                          onChange={handleFileUpload}
+                        />
+                      </label>
+                    ) : (
+                      <div className={`flex items-center justify-between p-3 ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'} rounded-lg`}>
+                        <div className="flex items-center space-x-3">
+                          <FileText className="w-6 h-6 text-cyan-500" />
+                          <div>
+                            <p className={`${currentTheme.text} font-bold text-sm`}>{fileName}</p>
+                            <p className={`${currentTheme.textMuted} text-xs`}>{fileType.toUpperCase()} file</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleRemoveFile}
+                          className={`p-2 ${theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-200'} rounded-lg transition-all`}
+                        >
+                          <X className="w-5 h-5 text-red-500" />
+                        </button>
+                      </div>
+                    )}
                   </div>
+                  )}
+
+                  {/* Text Input Mode */}
+                  {inputMode === 'text' && (
+                    <>
+                      <div>
+                        <label className={`block ${currentTheme.text} font-bold mb-2`}>Input Text</label>
+                        <textarea
+                          value={inputText}
+                          onChange={(e) => setInputText(e.target.value)}
+                          className={`w-full h-32 ${currentTheme.input} border-2 ${currentTheme.cardBorder} ${currentTheme.inputFocus} rounded-xl px-4 py-3 ${currentTheme.text} placeholder-opacity-30 focus:outline-none resize-none`}
+                          placeholder="Enter different text each time to earn points..."
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className={`block ${currentTheme.text} font-bold`}>Output Text</label>
+                          {outputText && (
+                            <div className="flex items-center space-x-2">
+                              {uploadedFile && (
+                                <button
+                                  onClick={handleDownloadFile}
+                                  className={`flex items-center space-x-2 px-4 py-2 ${theme === 'dark' ? 'bg-cyan-700 hover:bg-cyan-600' : 'bg-cyan-200 hover:bg-cyan-300'} rounded-lg ${currentTheme.text} transition-all`}
+                                >
+                                  <Download className="w-4 h-4" />
+                                  <span className="font-bold">Download</span>
+                                </button>
+                              )}
+                              <button
+                                onClick={copyToClipboard}
+                                className={`flex items-center space-x-2 px-4 py-2 ${theme === 'dark' ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-200 hover:bg-slate-300'} rounded-lg ${currentTheme.text} transition-all`}
+                              >
+                                {copied ? (
+                                  <>
+                                    <Check className="w-4 h-4 text-green-500" />
+                                    <span className="text-green-500 font-bold">Copied!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-4 h-4" />
+                                    <span className="font-bold">Copy</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <textarea
+                          value={outputText}
+                          readOnly
+                          className={`w-full h-32 ${theme === 'dark' ? 'bg-gradient-to-br from-slate-800 to-slate-700' : 'bg-gradient-to-br from-slate-50 to-slate-100'} border-2 ${currentTheme.cardBorder} rounded-xl px-4 py-3 ${currentTheme.text} font-bold focus:outline-none resize-none`}
+                          placeholder="Result will appear here..."
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* File Ready Message - Only show in file mode when file is uploaded */}
+                  {inputMode === 'file' && uploadedFile && (
+                    <div className={`${currentTheme.card} border-2 ${currentTheme.cardBorder} rounded-xl p-6 text-center`}>
+                      <FileText className={`w-16 h-16 mx-auto mb-4 ${currentTheme.textMuted}`} />
+                      <p className={`${currentTheme.text} font-bold text-lg mb-2`}>
+                        File Ready to Process
+                      </p>
+                      <p className={`${currentTheme.textMuted} text-sm mb-1`}>
+                        {fileName}
+                      </p>
+                      <p className={`${currentTheme.textMuted} text-xs`}>
+                        Click the button below to {mode === 'encrypt' ? 'encrypt' : 'decrypt'} and download
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 

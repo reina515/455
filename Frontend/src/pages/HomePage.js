@@ -9,7 +9,8 @@ import {
   Crown,
   Trophy,
   Sun,
-  Moon
+  Moon,
+  BookOpen
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -25,11 +26,11 @@ function authHeaders() {
 
 const HomePage = () => {
   const { user, updateUser, logout, loading } = useAuth();
-  const { theme, currentTheme, toggleTheme } = useTheme(); // ✅ Use centralized theme
+  const { theme, currentTheme, toggleTheme } = useTheme(); 
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-  // ✅ FETCH FRESH USER DATA ON PAGE LOAD (same as ProfilePage)
+  // FETCH FRESH USER DATA ON PAGE LOAD (same as ProfilePage)
   useEffect(() => {
     const fetchFresh = async () => {
       try {
@@ -62,7 +63,7 @@ const HomePage = () => {
     if (user) {
       fetchFresh();
     }
-  }, []); // Run once on mount
+  }, []); 
 
   // Loading
   if (loading) return null;
@@ -335,7 +336,7 @@ const HomePage = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <button
             onClick={() => navigate('/cipherlab')}
             className={`group relative ${currentTheme.card} backdrop-blur-xl border ${currentTheme.cardBorder} rounded-2xl p-8 hover:scale-105 transition-all duration-300 shadow-lg ${currentTheme.cardHover || ''}`}
@@ -404,6 +405,41 @@ const HomePage = () => {
               </p>
             </div>
           </button>
+        </div>
+
+        {/* Learn Ciphers Banner */}
+        <div 
+          onClick={() => navigate('/cipher-info')}
+          className={`group relative ${currentTheme.card} backdrop-blur-xl border ${currentTheme.cardBorder} rounded-2xl p-6 mb-16 hover:scale-[1.02] transition-all duration-300 shadow-lg cursor-pointer ${currentTheme.cardHover || ''}`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div
+                className={`w-14 h-14 ${
+                  theme === 'dark'
+                    ? 'bg-gradient-to-br from-amber-600 to-orange-700'
+                    : 'bg-gradient-to-br from-amber-500 to-orange-600'
+                } rounded-xl flex items-center justify-center`}
+              >
+                <BookOpen className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h3 className={`text-xl font-bold ${currentTheme.text}`}>
+                  📚 Cipher Encyclopedia
+                </h3>
+                <p className={`${currentTheme.textMuted} text-sm`}>
+                  Learn the theory behind each cipher with step-by-step explanations, examples, and mathematical foundations
+                </p>
+              </div>
+            </div>
+            <div className={`hidden md:block px-4 py-2 ${
+              theme === 'dark'
+                ? 'bg-gradient-to-r from-amber-600 to-orange-700'
+                : 'bg-gradient-to-r from-amber-500 to-orange-600'
+            } text-white font-bold rounded-lg group-hover:shadow-lg transition-all`}>
+              Learn More →
+            </div>
+          </div>
         </div>
 
         {/* STATS GRID */}
