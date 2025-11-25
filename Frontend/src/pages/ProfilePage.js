@@ -25,6 +25,39 @@ function authHeaders() {
   const t = localStorage.getItem('auth_token');
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
+// ⭐ Password Strength Calculator (same as Signup)
+const getPasswordStrength = (password) => {
+  let score = 0;
+
+  // LENGTH (max 50)
+  score += Math.min(password.length * 5, 50);
+
+  // CHARACTER REQUIREMENTS
+  const hasUpper = /[A-Z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSymbol = /[!@#$%^&*(),.?":{}|<>_\-]/.test(password);
+
+  if (hasUpper) score += 15;
+  if (hasNumber) score += 15;
+  if (hasSymbol) score += 20;
+
+  // LENGTH BONUSES
+  if (password.length >= 12) score += 10;
+  if (password.length >= 18) score += 10;
+
+  // Cap at 100
+  score = Math.min(score, 100);
+
+  // LABELS
+  let label = "";
+  if (score < 30) label = "Weak";
+  else if (score < 60) label = "Fair";
+  else if (score < 80) label = "Good";
+  else label = "Strong";
+
+  return { score, label };
+};
+
 
 const ProfilePage = () => {
   const { user, updateUser, logout } = useAuth();
@@ -32,25 +65,33 @@ const ProfilePage = () => {
   const navigate = useNavigate();
 
   const [editMode, setEditMode] = useState(false);
-  const [editName, setEditName] = useState(user?.name || "");
-  const [editEmail, setEditEmail] = useState(user?.email || "");
-  const [passwords, setPasswords] = useState({
-    current: '',
-    new: '',
-    confirm: '',
-  });
-  const [busy, setBusy] = useState(false);
+const [editName, setEditName] = useState(user?.name || "");
+const [editEmail, setEditEmail] = useState(user?.email || "");
+const [passwords, setPasswords] = useState({
+  current: '',
+  new: '',
+  confirm: '',
+});
+const [busy, setBusy] = useState(false);
 
-  // App-level notifications and delete-account modal
-  const [notification, setNotification] = useState(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+// App-level notifications and delete-account modal
+const [notification, setNotification] = useState(null);
+const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // control visibility of password fields
-  const [showPassword, setShowPassword] = useState({
-    current: false,
-    new: false,
-    confirm: false,
-  });
+// control visibility of password fields
+const [showPassword, setShowPassword] = useState({
+  current: false,
+  new: false,
+  confirm: false,
+});
+
+const [newPasswordStrength, setNewPasswordStrength] = useState({
+  score: 0,
+  label: "",
+});
+const [showNewPassword, setShowNewPassword] = useState(false);
+
+
 
   const showSuccess = (message) => setNotification({ type: 'success', message });
   const showError = (message) => setNotification({ type: 'error', message });
@@ -618,38 +659,82 @@ const ProfilePage = () => {
               </div>
             </div>
 
-            {/* New password */}
-            <div className="flex flex-col gap-1">
-              <label className={`${currentTheme.textMuted} text-xs uppercase tracking-wide`}>
-                New Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword.new ? 'text' : 'password'}
-                  className={`w-full rounded-xl border px-3 py-2 pr-10 text-sm outline-none ${currentTheme.input} ${currentTheme.inputFocus} ${passwordTextClasses}`}
-                  value={passwords.new}
-                  onChange={(e) =>
-                    setPasswords({
-                      ...passwords,
-                      new: e.target.value,
-                    })
-                  }
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-2 flex items-center text-xs text-slate-400 hover:text-slate-200"
-                  onClick={() =>
-                    setShowPassword((prev) => ({ ...prev, new: !prev.new }))
-                  }
-                >
-                  {showPassword.new ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            </div>
+            {/* New password with strength meter */}
+<div className="flex flex-col gap-1">
+  <label className={`${currentTheme.textMuted} text-xs uppercase tracking-wide`}>
+    New Password
+  </label>
+
+  <div className="relative">
+    <input
+      type={showNewPassword ? 'text' : 'password'}
+      className={`w-full rounded-xl border px-3 py-2 pr-10 text-sm outline-none 
+        ${currentTheme.input} ${currentTheme.inputFocus} ${passwordTextClasses}`}
+      value={passwords.new}
+      onChange={(e) => {
+        const value = e.target.value;
+        setPasswords({ ...passwords, new: value });
+        setNewPasswordStrength(getPasswordStrength(value));
+      }}
+      placeholder="••••••••"
+      required
+    />
+
+    {/* Show/hide button */}
+    <button
+      type="button"
+      className="absolute inset-y-0 right-2 flex items-center text-xs text-slate-400 hover:text-slate-200"
+      onClick={() => setShowNewPassword(!showNewPassword)}
+    >
+      {showNewPassword ? (
+        <EyeOff className="w-4 h-4" />
+      ) : (
+        <Eye className="w-4 h-4" />
+      )}
+    </button>
+  </div>
+
+  {/* Strength bar */}
+  {newPasswordStrength.label && (
+    <div className="mt-2">
+
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs text-slate-400">Strength</span>
+        <span
+          className={`text-xs font-bold ${
+            newPasswordStrength.score < 30
+              ? "text-red-400"
+              : newPasswordStrength.score < 60
+              ? "text-yellow-400"
+              : newPasswordStrength.score < 80
+              ? "text-blue-400"
+              : "text-green-400"
+          }`}
+        >
+          {newPasswordStrength.label}
+        </span>
+      </div>
+
+      <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
+        <div
+          className="h-full transition-all duration-200"
+          style={{
+            width: `${newPasswordStrength.score}%`,
+            background:
+              newPasswordStrength.score < 30
+                ? "#ef4444"  /* red */
+                : newPasswordStrength.score < 60
+                ? "#facc15" /* yellow */
+                : newPasswordStrength.score < 80
+                ? "#3b82f6" /* blue */
+                : "#22c55e", /* green */
+          }}
+        ></div>
+      </div>
+    </div>
+  )}
+</div>
+
 
             {/* Confirm new password */}
             <div className="flex flex-col gap-1">
