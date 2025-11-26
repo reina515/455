@@ -1359,7 +1359,7 @@ const newStats = {
                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
                           <FileText className={`w-8 h-8 mb-2 ${currentTheme.textMuted}`} />
                           <p className={`text-sm ${currentTheme.textMuted}`}>
-                            <span className="font-bold">Click to upload</span> or drag and drop
+                            <span className="font-bold">Click to upload</span> 
                           </p>
                           <p className={`text-xs ${currentTheme.textMuted}`}>
                             TXT, DOC, DOCX, or PDF files
